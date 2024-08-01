@@ -1148,6 +1148,7 @@ dependencies = [
  "reqwest",
  "scraper",
  "sdl2",
+ "serde",
  "serde_json",
  "tokio",
 ]
