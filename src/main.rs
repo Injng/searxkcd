@@ -27,7 +27,7 @@ async fn main() {
 
     // initialize xkcd index
     init_index();
-    let mut comics: Vec<Comic> = update_index().await;
+    let comics: Vec<Comic> = update_index().await;
 
     // initialize fonts
     let ttf_context: Sdl2TtfContext = ttf::init().expect("Failed to initialize TTF context");
@@ -58,6 +58,11 @@ async fn main() {
                 .unwrap();
         }
 
+        // draw search box
+        canvas.set_draw_color(Color::BLACK);
+        let search_box = Rect::new(100, 100, 1000, 30);
+        canvas.draw_rect(search_box).unwrap();
+
         // get latest xkcd
         let img_path: String = comics[comics.len() - 1].download_img().await;
         let img_texture: Texture = texture
@@ -74,6 +79,15 @@ async fn main() {
                 Event::TextInput { text, .. } => {
                     text_input += &text;
                 }
+                Event::KeyUp {
+                    keycode: Some(keycode),
+                    ..
+                } => match keycode {
+                    sdl2::keyboard::Keycode::Backspace => {
+                        text_input.pop();
+                    }
+                    _ => {}
+                },
                 _ => {}
             }
         }
