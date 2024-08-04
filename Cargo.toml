@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 dirs = "5.0.1"
 reqwest = "0.12.5"
-scraper = "0.19.1"
 sdl2 = { version = "0.37.0", features = ["image", "ttf"] }
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.120"
