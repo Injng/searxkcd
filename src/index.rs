@@ -209,7 +209,7 @@ pub async fn update_index() -> Vec<Comic> {
     let next_id: u64 = last_id + 1;
 
     // get comics that are not in index file
-    for id in next_id..get_latest_id().await {
+    for id in next_id..(get_latest_id().await + 1) {
         let comic: Comic = match get_comic(id).await {
             Ok(comic) => comic,
             Err(_) => {
