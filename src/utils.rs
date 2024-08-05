@@ -36,7 +36,7 @@ pub fn fit_rect(width: u32, height: u32, rect: Rect) -> Rect {
     // calculate scaling factors and select the biggest one
     let width_scale: f32 = rect_width as f32 / width as f32;
     let height_scale: f32 = rect_height as f32 / height as f32;
-    let scale: f32 = width_scale.max(height_scale);
+    let scale: f32 = width_scale.min(height_scale);
 
     // return new scaled Rect
     Rect::new(
