@@ -1,13 +1,17 @@
 pub mod index;
+pub mod search;
+pub mod utils;
 
 use index::{init_index, update_index, Comic};
+use search::get_results;
+use utils::render_text;
 
 use sdl2::event::Event;
 use sdl2::image::{InitFlag, LoadTexture};
+use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureQuery};
-use sdl2::surface::Surface;
 use sdl2::ttf::{self, Font, Sdl2TtfContext};
 use tokio;
 
@@ -38,24 +42,14 @@ async fn main() {
 
     // create event loop
     let mut event_pump = sdl_context.event_pump().unwrap();
+    let mut is_search = false;
+    let mut search_term: String = String::from("");
     'running: loop {
         // draw things
         canvas.set_draw_color(Color::WHITE);
         canvas.clear();
         if text_input.len() > 0 {
-            let text_surface: Surface = font
-                .render(&text_input)
-                .blended(Color::BLACK)
-                .expect("Failed to render text");
-            let text_texture = text_surface.as_texture(&texture);
-            let dimensions = font.size_of(&text_input).unwrap();
-            canvas
-                .copy(
-                    &text_texture.unwrap(),
-                    None,
-                    Some(Rect::new(100, 100, dimensions.0, dimensions.1)),
-                )
-                .unwrap();
+            render_text(&mut canvas, &texture, &font, &text_input, 100, 100);
         }
 
         // draw search box
@@ -63,15 +57,26 @@ async fn main() {
         let search_box = Rect::new(100, 100, 1000, 30);
         canvas.draw_rect(search_box).unwrap();
 
-        // get latest xkcd
-        let img_path: String = comics[comics.len() - 1].download_img().await;
-        let img_texture: Texture = texture
-            .load_texture(img_path)
-            .expect("Failed to load image");
-        let img_info: TextureQuery = img_texture.query();
-        let img_rect: Rect = Rect::new(200, 200, img_info.width, img_info.height);
-        canvas.copy(&img_texture, None, Some(img_rect)).unwrap();
-        canvas.present();
+        if !is_search {
+            // get latest xkcd
+            let img_path: String = comics[comics.len() - 1].download_img().await;
+            let img_texture: Texture = texture
+                .load_texture(img_path)
+                .expect("Failed to load image");
+            let img_info: TextureQuery = img_texture.query();
+            let img_rect: Rect = Rect::new(200, 200, img_info.width, img_info.height);
+            canvas.copy(&img_texture, None, Some(img_rect)).unwrap();
+            canvas.present();
+        } else {
+            let results: Vec<Comic> = get_results(search_term.clone()).await;
+            let mut offset_h: i32 = 150;
+            for comic in results {
+                let offset = (100, offset_h);
+                let img_rect: Rect = comic.render(&mut canvas, &texture, &font, offset).await;
+                offset_h += img_rect.height() as i32 + 70;
+            }
+            canvas.present();
+        }
 
         for event in event_pump.poll_iter() {
             match event {
@@ -83,8 +88,12 @@ async fn main() {
                     keycode: Some(keycode),
                     ..
                 } => match keycode {
-                    sdl2::keyboard::Keycode::Backspace => {
+                    Keycode::Backspace => {
                         text_input.pop();
+                    }
+                    Keycode::Return => {
+                        is_search = true;
+                        search_term = text_input.clone();
                     }
                     _ => {}
                 },
