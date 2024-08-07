@@ -1,11 +1,20 @@
+use crate::utils::{fit_rect, render_text};
+
 use dirs;
 use reqwest;
+
+use sdl2::image::LoadTexture;
+use sdl2::rect::Rect;
+use sdl2::render::{Canvas, TextureCreator};
+use sdl2::ttf::Font;
+use sdl2::video::{Window, WindowContext};
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Comic {
     id: u64,
     title: String,
@@ -25,6 +34,29 @@ impl Comic {
         }
     }
 
+    /// Returns a string containing the title, alt text, id, and transcript
+    pub fn blob(&self) -> String {
+        let blob: String = format!(
+            "{} {} {} {}",
+            self.title,
+            self.alt,
+            self.id.to_string(),
+            self.transcript
+        );
+        blob
+    }
+
+    /// Returns the path to which the image would be downloaded
+    fn get_path(&self) -> String {
+        let home = dirs::home_dir().unwrap();
+        let path_str = format!(
+            "{}/.local/share/searxkcd/images/{}.png",
+            home.display(),
+            self.id.to_string()
+        );
+        path_str
+    }
+
     /// Downloads the comic image saving it to the proper directory, and returning the path
     pub async fn download_img(&self) -> String {
         // setup paths
@@ -39,13 +71,54 @@ impl Comic {
         // get the image
         let img = reqwest::get(&self.img)
             .await
-            .unwrap()
+            .expect("Unable to get image (are you connected to the Internet?)")
             .bytes()
             .await
             .unwrap();
         fs::write(img_path, img).expect("Failed to write image");
 
         path_str
+    }
+
+    /// Render the comic image and information, and returns the Rect of the image
+    pub async fn render(
+        &self,
+        canvas: &mut Canvas<Window>,
+        texture: &TextureCreator<WindowContext>,
+        font: &Font<'_, '_>,
+        offset: (i32, i32),
+    ) -> Rect {
+        // get image from path
+        let img_path = self.get_path();
+        let img_texture = match texture.load_texture(img_path) {
+            Ok(texture) => texture,
+            Err(_) => {
+                let path = self.download_img().await;
+                texture.load_texture(path).unwrap()
+            }
+        };
+        let img_width = img_texture.query().width;
+        let img_height = img_texture.query().height;
+
+        // render image with proper scaling
+        let fill_rect: Rect = Rect::new(offset.0, offset.1 + 20, 300, 200);
+        let img_rect: Rect = fit_rect(img_width, img_height, fill_rect);
+        canvas.copy(&img_texture, None, img_rect).unwrap();
+
+        // render title
+        render_text(canvas, &texture, &font, &self.title, offset.0, offset.1);
+
+        // render alt text
+        render_text(
+            canvas,
+            &texture,
+            &font,
+            &self.alt,
+            offset.0,
+            offset.1 + img_rect.height() as i32 + 20,
+        );
+
+        img_rect
     }
 }
 
