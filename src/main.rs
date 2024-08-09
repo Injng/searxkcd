@@ -40,21 +40,40 @@ async fn main() {
         .expect("Failed to load font");
     let mut text_input: String = String::from("");
 
+    // create scrolling variables
+    let mut scroll_up = false;
+    let mut scroll_down = false;
+    let mut scroll_offset: i32 = 0;
+
     // create event loop
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut is_search = false;
     let mut search_term: String = String::from("");
     'running: loop {
+        // handle scrolling
+        if scroll_up {
+            scroll_offset += 10;
+        } else if scroll_down {
+            scroll_offset -= 10;
+        }
+
         // draw things
         canvas.set_draw_color(Color::WHITE);
         canvas.clear();
         if text_input.len() > 0 {
-            render_text(&mut canvas, &texture, &font, &text_input, 100, 100);
+            render_text(
+                &mut canvas,
+                &texture,
+                &font,
+                &text_input,
+                100,
+                100 + scroll_offset,
+            );
         }
 
         // draw search box
         canvas.set_draw_color(Color::BLACK);
-        let search_box = Rect::new(100, 100, 1000, 30);
+        let search_box = Rect::new(100, 100 + scroll_offset, 1000, 30);
         canvas.draw_rect(search_box).unwrap();
 
         if !is_search {
@@ -64,12 +83,13 @@ async fn main() {
                 .load_texture(img_path)
                 .expect("Failed to load image");
             let img_info: TextureQuery = img_texture.query();
-            let img_rect: Rect = Rect::new(200, 200, img_info.width, img_info.height);
+            let img_rect: Rect =
+                Rect::new(200, 200 + scroll_offset, img_info.width, img_info.height);
             canvas.copy(&img_texture, None, Some(img_rect)).unwrap();
             canvas.present();
         } else {
             let results: Vec<Comic> = get_results(search_term.clone()).await;
-            let mut offset_h: i32 = 150;
+            let mut offset_h: i32 = 150 + scroll_offset;
             for comic in results {
                 let offset = (100, offset_h);
                 let img_rect: Rect = comic.render(&mut canvas, &texture, &font, offset).await;
@@ -84,6 +104,20 @@ async fn main() {
                 Event::TextInput { text, .. } => {
                     text_input += &text;
                 }
+                Event::KeyDown {
+                    keycode: Some(keycode),
+                    ..
+                } => match keycode {
+                    Keycode::Down => {
+                        scroll_up = false;
+                        scroll_down = true;
+                    }
+                    Keycode::Up => {
+                        scroll_down = false;
+                        scroll_up = true;
+                    }
+                    _ => {}
+                },
                 Event::KeyUp {
                     keycode: Some(keycode),
                     ..
@@ -94,6 +128,12 @@ async fn main() {
                     Keycode::Return => {
                         is_search = true;
                         search_term = text_input.clone();
+                    }
+                    Keycode::Down => {
+                        scroll_down = false;
+                    }
+                    Keycode::Up => {
+                        scroll_up = false;
                     }
                     _ => {}
                 },
